@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RiskMaster: El Desafío Tributario - Prueba</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        button {
+            padding: 5px 10px;
+            background: #00ffcc;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #00b399;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas"></div>
+    <div id="ui">
+        <h2>RiskMaster: Radar del Riesgo</h2>
+        <p>Riesgos Detectados: <span id="risk-count">0</span></p>
+        <button onclick="resetRisks()">Reiniciar</button>
+    </div>
+    <div id="instructions">
+        <p>Usa el mouse para mover la cámara. Haz clic en las esferas rojas para detectar riesgos.</p>
+    </div>
+
+    <!-- Referencia local a Three.js -->
+    <script src="three.min.js"></script>
+    <script>
+        // Escena, cámara y renderizador
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas').appendChild(renderer.domElement);
+
+        // Controles de órbita (mover cámara con mouse)
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Plano (mapa de Fiscalia)
+        const planeGeometry = new THREE.PlaneGeometry(50, 50);
+        const planeMaterial = new THREE.MeshBasicMaterial({ color: 0x16213e, side: THREE.DoubleSide });
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = Math.PI / 2;
+        scene.add(plane);
+
+        // Luces
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(0, 10, 10);
+        scene.add(directionalLight);
+
+        // Riesgos (esferas rojas)
+        let risks = [];
+        let riskCount = 0;
+        const riskMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+        function createRisk() {
+            const riskGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+            const risk = new THREE.Mesh(riskGeometry, riskMaterial);
+            risk.position.set(
+                Math.random() * 40 - 20, // X aleatoria
+                0.5,                     // Y fija (sobre el plano)
+                Math.random() * 40 - 20  // Z aleatoria
+            );
+            scene.add(risk);
+            risks.push(risk);
+        }
+
+        // Generar riesgos iniciales
+        for (let i = 0; i < 5; i++) {
+            createRisk();
+        }
+
+        // Posición inicial de la cámara
+        camera.position.set(0, 10, 20);
+        camera.lookAt(0, 0, 0);
+
+        // Raycaster para detectar clics
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(risks);
+
+            if (intersects.length > 0) {
+                const risk = intersects[0].object;
+                scene.remove(risk);
+                risks = risks.filter(r => r !== risk);
+                riskCount++;
+                document.getElementById('risk-count').innerText = riskCount;
+                createParticles(risk.position);
+            }
+        }
+
+        // Partículas al detectar riesgo
+        function createParticles(position) {
+            const particleGeometry = new THREE.BufferGeometry();
+            const particleCount = 20;
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = position.x + (Math.random() - 0.5) * 2;
+                positions[i * 3 + 1] = position.y + Math.random() * 2;
+                positions[i * 3 + 2] = position.z + (Math.random() - 0.5) * 2;
+            }
+
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const particleMaterial = new THREE.PointsMaterial({ color: 0x00ffcc, size: 0.2 });
+            const particles = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(particles);
+
+            setTimeout(() => scene.remove(particles), 1000);
+        }
+
+        // Reiniciar riesgos
+        window.resetRisks = function() {
+            risks.forEach(risk => scene.remove(risk));
+            risks = [];
+            riskCount = 0;
+            document.getElementById('risk-count').innerText = riskCount;
+            for (let i = 0; i < 5; i++) {
+                createRisk();
+            }
+        };
+
+        // Animación
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Evento de clic
+        window.addEventListener('click', onMouseClick);
+
+        // Ajustar tamaño al redimensionar ventana
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
