@@ -147,6 +147,12 @@ const SPECIALIZED_SITES = {
       description: "Búsqueda de propiedades en Miami-Dade",
       color: "bg-cyan-50 dark:bg-cyan-950/20",
     },
+    pbcpao: {
+      name: "Palm Beach County Property",
+      domain: "pbcpao.gov",
+      description: "Búsqueda de propiedades en Palm Beach County",
+      color: "bg-teal-50 dark:bg-teal-950/20",
+    },
     publicdatausa: {
       name: "Public Data USA",
       domain: "publicdatausa.com",
@@ -233,6 +239,7 @@ export default function GoogleSiteSearch() {
     datocapital: true,
     zefix: true,
     miamidade: true,
+    pbcpao: true,
     publicdatausa: true,
     whitepages: true,
     impo: true,
@@ -385,6 +392,12 @@ export default function GoogleSiteSearch() {
         snippet = `...información sobre propiedades relacionadas con "${cleanQuery}" en el Condado de Miami-Dade. Consulte detalles sobre propietarios, valores de tasación, impuestos y otra información inmobiliaria. Use la búsqueda en el sitio para encontrar propiedades...`
         break
 
+      case "pbcpao":
+        title = `${cleanQuery.charAt(0).toUpperCase() + cleanQuery.slice(1)} - Propiedades en Palm Beach County`
+        url = `https://pbcpao.gov/index.htm`
+        snippet = `...información sobre propiedades relacionadas con "${cleanQuery}" en el Condado de Palm Beach. Consulte detalles sobre propietarios, valores de tasación, impuestos y otra información inmobiliaria. Use la búsqueda en el sitio para encontrar propiedades...`
+        break
+
       case "publicdatausa":
         title = `${cleanQuery.charAt(0).toUpperCase() + cleanQuery.slice(1)} - Registros Públicos en EE.UU.`
         url = `https://${site.domain}/index.php?q=${encodeURIComponent(query)}`
@@ -518,6 +531,7 @@ export default function GoogleSiteSearch() {
       case "secedgar":
         return <FileText className="h-3 w-3 mr-1" />
       case "miamidade":
+      case "pbcpao":
         return <Home className="h-3 w-3 mr-1" />
       case "whitepages":
         return <User className="h-3 w-3 mr-1" />
