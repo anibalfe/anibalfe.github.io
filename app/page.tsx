@@ -300,17 +300,67 @@ export default function GoogleSiteSearch() {
     selectedDomains.length > 0 || Object.values(specializedSites).some((isSelected) => isSelected)
   const hasSpecializedSites = Object.values(specializedSites).some((isSelected) => isSelected)
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim() || !hasSpecializedSites) return
 
     setIsSearching(true)
     setCurrentSearchTerm(searchQuery)
 
-    setTimeout(() => {
-      const mockResults = generateMockResults(searchQuery, specializedSites)
-      setSearchResults(mockResults)
+    try {
+      // Generate results for non-Aleph sites
+      const otherResults = generateMockResults(searchQuery, { ...specializedSites, aleph: false })
+
+      // If Aleph is selected, fetch real results from the API
+      if (specializedSites.aleph) {
+        try {
+          const response = await fetch(`/api/aleph?q=${encodeURIComponent(searchQuery)}`)
+          const data = await response.json()
+
+          if (response.ok && data.results && data.results.length > 0) {
+            // Transform Aleph API results to match the existing format
+            const alephResults = data.results.map((item: any) => ({
+              title: item.title,
+              url: item.url,
+              snippet: item.summary || `Documento en colección "${item.collection}". ${item.countries?.length > 0 ? `Países: ${item.countries.join(", ")}` : ""}`,
+              source: "aleph",
+              sourceName: "Aleph OCCRP",
+              isRealResult: true,
+              schema: item.schema,
+              collection: item.collection,
+            }))
+            
+            setSearchResults([...alephResults, ...otherResults])
+          } else {
+            // If no Aleph results or error, show fallback with link to search
+            const fallbackAlephResult = {
+              title: `Buscar "${searchQuery}" en Aleph OCCRP`,
+              url: `https://aleph.occrp.org/search?q=${searchQuery.replace(/\s+/g, "+")}`,
+              snippet: `No se encontraron resultados directos. Haga clic para buscar "${searchQuery}" directamente en Aleph OCCRP.`,
+              source: "aleph",
+              sourceName: "Aleph OCCRP",
+              isRealResult: false,
+            }
+            setSearchResults([fallbackAlephResult, ...otherResults])
+          }
+        } catch (error) {
+          console.error("Error fetching Aleph results:", error)
+          // On error, show fallback result
+          const fallbackAlephResult = {
+            title: `Buscar "${searchQuery}" en Aleph OCCRP`,
+            url: `https://aleph.occrp.org/search?q=${searchQuery.replace(/\s+/g, "+")}`,
+            snippet: `Error al conectar con la API. Haga clic para buscar directamente en Aleph OCCRP.`,
+            source: "aleph",
+            sourceName: "Aleph OCCRP",
+            isRealResult: false,
+          }
+          setSearchResults([fallbackAlephResult, ...otherResults])
+        }
+      } else {
+        setSearchResults(otherResults)
+      }
+    } finally {
       setIsSearching(false)
-    }, 1000)
+    }
   }
 
   const generateResultForSite = (siteKey: string, site: any, query: string) => {
