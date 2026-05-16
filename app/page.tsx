@@ -15,6 +15,7 @@ import { SiteCategory } from "./components/site-category"
 const TAX_HAVEN_DOMAINS = [
   ".ac", // Isla de la Ascensión
   ".ad", // Andorra
+  ".ae", // Emiratos Árabes Unidos
   ".ag", // Antigua y Barbuda
   ".ai", // Anguila
   ".al", // Albania
@@ -23,40 +24,52 @@ const TAX_HAVEN_DOMAINS = [
   ".aw", // Aruba
   ".ba", // Bosnia y Herzegovina
   ".bm", // Bermudas
+  ".bn", // Brunéi
+  ".bo", // Bolivia
   ".bs", // Bahamas
   ".bw", // Botsuana
   ".bz", // Belice
   ".cc", // Islas Cocos
   ".ch", // Suiza
   ".cr", // Costa Rica
+  ".cw", // Curazao
   ".cx", // Isla Christmas
   ".cy", // Chipre
+  ".dj", // Yibuti
   ".dm", // Dominica
   ".fk", // Islas Malvinas
   ".fm", // Micronesia
   ".gd", // Granada
   ".ge", // Georgia
+  ".gf", // Guayana Francesa
   ".gg", // Guernsey
   ".gh", // Ghana
   ".gi", // Gibraltar
+  ".gw", // Guinea-Bisáu
   ".hk", // Hong Kong
   ".hn", // Honduras
   ".im", // Isla de Man
   ".je", // Jersey
   ".jm", // Jamaica
+  ".kg", // Kirguistán
   ".kh", // Camboya
   ".kn", // San Cristóbal y Nieves
   ".ky", // Islas Caimán
+  ".kz", // Kazajistán
   ".lc", // Santa Lucía
   ".li", // Liechtenstein
+  ".lr", // Liberia
   ".lu", // Luxemburgo
   ".mc", // Mónaco
   ".me", // Montenegro
+  ".mh", // Islas Marshall
   ".mk", // Macedonia del Norte
+  ".mn", // Mongolia
   ".mt", // Malta
   ".mu", // Mauricio
   ".mw", // Malaui
   ".my", // Malasia
+  ".mz", // Mozambique
   ".na", // Namibia
   ".nf", // Isla Norfolk
   ".ng", // Nigeria
@@ -65,6 +78,7 @@ const TAX_HAVEN_DOMAINS = [
   ".nr", // Nauru
   ".nu", // Niue
   ".pa", // Panamá
+  ".pg", // Papúa Nueva Guinea
   ".ph", // Filipinas
   ".pm", // San Pedro y Miquelón
   ".pn", // Islas Pitcairn
@@ -80,15 +94,20 @@ const TAX_HAVEN_DOMAINS = [
   ".sz", // Esuatini
   ".tc", // Islas Turcas y Caicos
   ".tk", // Tokelau
+  ".tn", // Túnez
   ".to", // Tonga
   ".tt", // Trinidad y Tobago
   ".tv", // Tuvalu
+  ".tz", // Tanzania
   ".ua", // Ucrania
+  ".uz", // Uzbekistán
   ".vc", // San Vicente y las Granadinas
+  ".ve", // Venezuela
   ".vg", // Islas Vírgenes Británicas
   ".vn", // Vietnam
   ".vu", // Vanuatu
   ".ws", // Samoa
+  ".zm", // Zambia
   ".zw", // Zimbabue
 ]
 
@@ -300,17 +319,67 @@ export default function GoogleSiteSearch() {
     selectedDomains.length > 0 || Object.values(specializedSites).some((isSelected) => isSelected)
   const hasSpecializedSites = Object.values(specializedSites).some((isSelected) => isSelected)
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim() || !hasSpecializedSites) return
 
     setIsSearching(true)
     setCurrentSearchTerm(searchQuery)
 
-    setTimeout(() => {
-      const mockResults = generateMockResults(searchQuery, specializedSites)
-      setSearchResults(mockResults)
+    try {
+      // Generate results for non-Aleph sites
+      const otherResults = generateMockResults(searchQuery, { ...specializedSites, aleph: false })
+
+      // If Aleph is selected, fetch real results from the API
+      if (specializedSites.aleph) {
+        try {
+          const response = await fetch(`/api/aleph?q=${encodeURIComponent(searchQuery)}`)
+          const data = await response.json()
+
+          if (response.ok && data.results && data.results.length > 0) {
+            // Transform Aleph API results to match the existing format
+            const alephResults = data.results.map((item: any) => ({
+              title: item.title,
+              url: item.url,
+              snippet: item.summary || `Documento en colección "${item.collection}". ${item.countries?.length > 0 ? `Países: ${item.countries.join(", ")}` : ""}`,
+              source: "aleph",
+              sourceName: "Aleph OCCRP",
+              isRealResult: true,
+              schema: item.schema,
+              collection: item.collection,
+            }))
+            
+            setSearchResults([...alephResults, ...otherResults])
+          } else {
+            // If no Aleph results or error, show fallback with link to search
+            const fallbackAlephResult = {
+              title: `Buscar "${searchQuery}" en Aleph OCCRP`,
+              url: `https://aleph.occrp.org/search?q=${searchQuery.replace(/\s+/g, "+")}`,
+              snippet: `No se encontraron resultados directos. Haga clic para buscar "${searchQuery}" directamente en Aleph OCCRP.`,
+              source: "aleph",
+              sourceName: "Aleph OCCRP",
+              isRealResult: false,
+            }
+            setSearchResults([fallbackAlephResult, ...otherResults])
+          }
+        } catch (error) {
+          console.error("Error fetching Aleph results:", error)
+          // On error, show fallback result
+          const fallbackAlephResult = {
+            title: `Buscar "${searchQuery}" en Aleph OCCRP`,
+            url: `https://aleph.occrp.org/search?q=${searchQuery.replace(/\s+/g, "+")}`,
+            snippet: `Error al conectar con la API. Haga clic para buscar directamente en Aleph OCCRP.`,
+            source: "aleph",
+            sourceName: "Aleph OCCRP",
+            isRealResult: false,
+          }
+          setSearchResults([fallbackAlephResult, ...otherResults])
+        }
+      } else {
+        setSearchResults(otherResults)
+      }
+    } finally {
       setIsSearching(false)
-    }, 1000)
+    }
   }
 
   const generateResultForSite = (siteKey: string, site: any, query: string) => {
